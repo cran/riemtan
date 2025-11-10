@@ -1,0 +1,812 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+
+<meta charset="utf-8" />
+<meta name="generator" content="pandoc" />
+<meta http-equiv="X-UA-Compatible" content="IE=EDGE" />
+
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+
+
+
+<title>Performance Benchmarking and Optimization</title>
+
+<script>// Pandoc 2.9 adds attributes on both header and div. We remove the former (to
+// be compatible with the behavior of Pandoc < 2.8).
+document.addEventListener('DOMContentLoaded', function(e) {
+  var hs = document.querySelectorAll("div.section[class*='level'] > :first-child");
+  var i, h, a;
+  for (i = 0; i < hs.length; i++) {
+    h = hs[i];
+    if (!/^h[1-6]$/i.test(h.tagName)) continue;  // it should be a header h1-h6
+    a = h.attributes;
+    while (a.length > 0) h.removeAttribute(a[0].name);
+  }
+});
+</script>
+
+<style type="text/css">
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+span.underline{text-decoration: underline;}
+div.column{display: inline-block; vertical-align: top; width: 50%;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+</style>
+
+
+
+<style type="text/css">
+code {
+white-space: pre;
+}
+.sourceCode {
+overflow: visible;
+}
+</style>
+<style type="text/css" data-origin="pandoc">
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+{ counter-reset: source-line 0; }
+pre.numberSource code > span
+{ position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+{ content: counter(source-line);
+position: relative; left: -1em; text-align: right; vertical-align: baseline;
+border: none; display: inline-block;
+-webkit-touch-callout: none; -webkit-user-select: none;
+-khtml-user-select: none; -moz-user-select: none;
+-ms-user-select: none; user-select: none;
+padding: 0 4px; width: 4em;
+color: #aaaaaa;
+}
+pre.numberSource { margin-left: 3em; border-left: 1px solid #aaaaaa; padding-left: 4px; }
+div.sourceCode
+{ }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+code span.al { color: #ff0000; font-weight: bold; } 
+code span.an { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.at { color: #7d9029; } 
+code span.bn { color: #40a070; } 
+code span.bu { color: #008000; } 
+code span.cf { color: #007020; font-weight: bold; } 
+code span.ch { color: #4070a0; } 
+code span.cn { color: #880000; } 
+code span.co { color: #60a0b0; font-style: italic; } 
+code span.cv { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.do { color: #ba2121; font-style: italic; } 
+code span.dt { color: #902000; } 
+code span.dv { color: #40a070; } 
+code span.er { color: #ff0000; font-weight: bold; } 
+code span.ex { } 
+code span.fl { color: #40a070; } 
+code span.fu { color: #06287e; } 
+code span.im { color: #008000; font-weight: bold; } 
+code span.in { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.kw { color: #007020; font-weight: bold; } 
+code span.op { color: #666666; } 
+code span.ot { color: #007020; } 
+code span.pp { color: #bc7a00; } 
+code span.sc { color: #4070a0; } 
+code span.ss { color: #bb6688; } 
+code span.st { color: #4070a0; } 
+code span.va { color: #19177c; } 
+code span.vs { color: #4070a0; } 
+code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } 
+</style>
+<script>
+// apply pandoc div.sourceCode style to pre.sourceCode instead
+(function() {
+  var sheets = document.styleSheets;
+  for (var i = 0; i < sheets.length; i++) {
+    if (sheets[i].ownerNode.dataset["origin"] !== "pandoc") continue;
+    try { var rules = sheets[i].cssRules; } catch (e) { continue; }
+    var j = 0;
+    while (j < rules.length) {
+      var rule = rules[j];
+      // check if there is a div.sourceCode rule
+      if (rule.type !== rule.STYLE_RULE || rule.selectorText !== "div.sourceCode") {
+        j++;
+        continue;
+      }
+      var style = rule.style.cssText;
+      // check if color or background-color is set
+      if (rule.style.color === '' && rule.style.backgroundColor === '') {
+        j++;
+        continue;
+      }
+      // replace div.sourceCode by a pre.sourceCode rule
+      sheets[i].deleteRule(j);
+      sheets[i].insertRule('pre.sourceCode{' + style + '}', j);
+    }
+  }
+})();
+</script>
+
+
+
+
+<style type="text/css">body {
+background-color: #fff;
+margin: 1em auto;
+max-width: 700px;
+overflow: visible;
+padding-left: 2em;
+padding-right: 2em;
+font-family: "Open Sans", "Helvetica Neue", Helvetica, Arial, sans-serif;
+font-size: 14px;
+line-height: 1.35;
+}
+#TOC {
+clear: both;
+margin: 0 0 10px 10px;
+padding: 4px;
+width: 400px;
+border: 1px solid #CCCCCC;
+border-radius: 5px;
+background-color: #f6f6f6;
+font-size: 13px;
+line-height: 1.3;
+}
+#TOC .toctitle {
+font-weight: bold;
+font-size: 15px;
+margin-left: 5px;
+}
+#TOC ul {
+padding-left: 40px;
+margin-left: -1.5em;
+margin-top: 5px;
+margin-bottom: 5px;
+}
+#TOC ul ul {
+margin-left: -2em;
+}
+#TOC li {
+line-height: 16px;
+}
+table {
+margin: 1em auto;
+border-width: 1px;
+border-color: #DDDDDD;
+border-style: outset;
+border-collapse: collapse;
+}
+table th {
+border-width: 2px;
+padding: 5px;
+border-style: inset;
+}
+table td {
+border-width: 1px;
+border-style: inset;
+line-height: 18px;
+padding: 5px 5px;
+}
+table, table th, table td {
+border-left-style: none;
+border-right-style: none;
+}
+table thead, table tr.even {
+background-color: #f7f7f7;
+}
+p {
+margin: 0.5em 0;
+}
+blockquote {
+background-color: #f6f6f6;
+padding: 0.25em 0.75em;
+}
+hr {
+border-style: solid;
+border: none;
+border-top: 1px solid #777;
+margin: 28px 0;
+}
+dl {
+margin-left: 0;
+}
+dl dd {
+margin-bottom: 13px;
+margin-left: 13px;
+}
+dl dt {
+font-weight: bold;
+}
+ul {
+margin-top: 0;
+}
+ul li {
+list-style: circle outside;
+}
+ul ul {
+margin-bottom: 0;
+}
+pre, code {
+background-color: #f7f7f7;
+border-radius: 3px;
+color: #333;
+white-space: pre-wrap; 
+}
+pre {
+border-radius: 3px;
+margin: 5px 0px 10px 0px;
+padding: 10px;
+}
+pre:not([class]) {
+background-color: #f7f7f7;
+}
+code {
+font-family: Consolas, Monaco, 'Courier New', monospace;
+font-size: 85%;
+}
+p > code, li > code {
+padding: 2px 0px;
+}
+div.figure {
+text-align: center;
+}
+img {
+background-color: #FFFFFF;
+padding: 2px;
+border: 1px solid #DDDDDD;
+border-radius: 3px;
+border: 1px solid #CCCCCC;
+margin: 0 5px;
+}
+h1 {
+margin-top: 0;
+font-size: 35px;
+line-height: 40px;
+}
+h2 {
+border-bottom: 4px solid #f7f7f7;
+padding-top: 10px;
+padding-bottom: 2px;
+font-size: 145%;
+}
+h3 {
+border-bottom: 2px solid #f7f7f7;
+padding-top: 10px;
+font-size: 120%;
+}
+h4 {
+border-bottom: 1px solid #f7f7f7;
+margin-left: 8px;
+font-size: 105%;
+}
+h5, h6 {
+border-bottom: 1px solid #ccc;
+font-size: 105%;
+}
+a {
+color: #0033dd;
+text-decoration: none;
+}
+a:hover {
+color: #6666ff; }
+a:visited {
+color: #800080; }
+a:visited:hover {
+color: #BB00BB; }
+a[href^="http:"] {
+text-decoration: underline; }
+a[href^="https:"] {
+text-decoration: underline; }
+
+code > span.kw { color: #555; font-weight: bold; } 
+code > span.dt { color: #902000; } 
+code > span.dv { color: #40a070; } 
+code > span.bn { color: #d14; } 
+code > span.fl { color: #d14; } 
+code > span.ch { color: #d14; } 
+code > span.st { color: #d14; } 
+code > span.co { color: #888888; font-style: italic; } 
+code > span.ot { color: #007020; } 
+code > span.al { color: #ff0000; font-weight: bold; } 
+code > span.fu { color: #900; font-weight: bold; } 
+code > span.er { color: #a61717; background-color: #e3d2d2; } 
+</style>
+
+
+
+
+</head>
+
+<body>
+
+
+
+
+<h1 class="title toc-ignore">Performance Benchmarking and
+Optimization</h1>
+
+
+
+<div id="introduction" class="section level2">
+<h2>Introduction</h2>
+<p><strong>New in v0.2.5</strong>: riemtan includes cross-platform
+parallel processing using the futureverse framework. This vignette
+demonstrates how to benchmark performance and optimize your workflows
+for large brain connectome datasets.</p>
+</div>
+<div id="parallel-processing-overview" class="section level2">
+<h2>Parallel Processing Overview</h2>
+<p>riemtan’s parallel processing provides:</p>
+<ul>
+<li><strong>Cross-platform compatibility</strong>: Works on Windows,
+Mac, and Linux</li>
+<li><strong>Intelligent auto-detection</strong>: Automatically uses
+parallelization when beneficial</li>
+<li><strong>Optional progress reporting</strong>: Monitor long-running
+computations</li>
+<li><strong>Full backwards compatibility</strong>: Existing code works
+unchanged</li>
+</ul>
+</div>
+<div id="setup" class="section level2">
+<h2>Setup</h2>
+<div class="sourceCode" id="cb1"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" tabindex="-1"></a><span class="fu">library</span>(riemtan)</span>
+<span id="cb1-2"><a href="#cb1-2" tabindex="-1"></a><span class="fu">library</span>(Matrix)</span>
+<span id="cb1-3"><a href="#cb1-3" tabindex="-1"></a><span class="fu">library</span>(microbenchmark)  <span class="co"># For benchmarking</span></span>
+<span id="cb1-4"><a href="#cb1-4" tabindex="-1"></a></span>
+<span id="cb1-5"><a href="#cb1-5" tabindex="-1"></a><span class="co"># Load AIRM metric</span></span>
+<span id="cb1-6"><a href="#cb1-6" tabindex="-1"></a><span class="fu">data</span>(airm)</span>
+<span id="cb1-7"><a href="#cb1-7" tabindex="-1"></a></span>
+<span id="cb1-8"><a href="#cb1-8" tabindex="-1"></a><span class="co"># Create example dataset (100 matrices of size 50x50)</span></span>
+<span id="cb1-9"><a href="#cb1-9" tabindex="-1"></a><span class="fu">set.seed</span>(<span class="dv">42</span>)</span>
+<span id="cb1-10"><a href="#cb1-10" tabindex="-1"></a>create_spd_matrix <span class="ot">&lt;-</span> <span class="cf">function</span>(p) {</span>
+<span id="cb1-11"><a href="#cb1-11" tabindex="-1"></a>  mat <span class="ot">&lt;-</span> <span class="fu">diag</span>(p) <span class="sc">+</span> <span class="fu">matrix</span>(<span class="fu">rnorm</span>(p<span class="sc">*</span>p, <span class="dv">0</span>, <span class="fl">0.1</span>), p, p)</span>
+<span id="cb1-12"><a href="#cb1-12" tabindex="-1"></a>  mat <span class="ot">&lt;-</span> (mat <span class="sc">+</span> <span class="fu">t</span>(mat)) <span class="sc">/</span> <span class="dv">2</span></span>
+<span id="cb1-13"><a href="#cb1-13" tabindex="-1"></a>  mat <span class="ot">&lt;-</span> mat <span class="sc">+</span> <span class="fu">diag</span>(p) <span class="sc">*</span> <span class="fl">0.5</span></span>
+<span id="cb1-14"><a href="#cb1-14" tabindex="-1"></a>  Matrix<span class="sc">::</span><span class="fu">pack</span>(Matrix<span class="sc">::</span><span class="fu">Matrix</span>(mat, <span class="at">sparse =</span> <span class="cn">FALSE</span>))</span>
+<span id="cb1-15"><a href="#cb1-15" tabindex="-1"></a>}</span>
+<span id="cb1-16"><a href="#cb1-16" tabindex="-1"></a></span>
+<span id="cb1-17"><a href="#cb1-17" tabindex="-1"></a>connectomes <span class="ot">&lt;-</span> <span class="fu">lapply</span>(<span class="dv">1</span><span class="sc">:</span><span class="dv">100</span>, <span class="cf">function</span>(i) <span class="fu">create_spd_matrix</span>(<span class="dv">50</span>))</span></code></pre></div>
+</div>
+<div id="benchmarking-parallel-vs-sequential" class="section level2">
+<h2>Benchmarking Parallel vs Sequential</h2>
+<div id="tangent-computations" class="section level3">
+<h3>Tangent Computations</h3>
+<p>Compare parallel vs sequential performance for tangent space
+projections:</p>
+<div class="sourceCode" id="cb2"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" tabindex="-1"></a><span class="co"># Create sample</span></span>
+<span id="cb2-2"><a href="#cb2-2" tabindex="-1"></a>sample <span class="ot">&lt;-</span> CSample<span class="sc">$</span><span class="fu">new</span>(<span class="at">conns =</span> connectomes, <span class="at">metric_obj =</span> airm)</span>
+<span id="cb2-3"><a href="#cb2-3" tabindex="-1"></a></span>
+<span id="cb2-4"><a href="#cb2-4" tabindex="-1"></a><span class="co"># Sequential baseline</span></span>
+<span id="cb2-5"><a href="#cb2-5" tabindex="-1"></a><span class="fu">set_parallel_plan</span>(<span class="st">&quot;sequential&quot;</span>)</span>
+<span id="cb2-6"><a href="#cb2-6" tabindex="-1"></a>time_seq <span class="ot">&lt;-</span> <span class="fu">system.time</span>(sample<span class="sc">$</span><span class="fu">compute_tangents</span>())</span>
+<span id="cb2-7"><a href="#cb2-7" tabindex="-1"></a><span class="fu">print</span>(<span class="fu">paste</span>(<span class="st">&quot;Sequential:&quot;</span>, <span class="fu">round</span>(time_seq[<span class="dv">3</span>], <span class="dv">2</span>), <span class="st">&quot;seconds&quot;</span>))</span>
+<span id="cb2-8"><a href="#cb2-8" tabindex="-1"></a></span>
+<span id="cb2-9"><a href="#cb2-9" tabindex="-1"></a><span class="co"># Parallel with 4 workers</span></span>
+<span id="cb2-10"><a href="#cb2-10" tabindex="-1"></a><span class="fu">set_parallel_plan</span>(<span class="st">&quot;multisession&quot;</span>, <span class="at">workers =</span> <span class="dv">4</span>)</span>
+<span id="cb2-11"><a href="#cb2-11" tabindex="-1"></a>time_par4 <span class="ot">&lt;-</span> <span class="fu">system.time</span>(sample<span class="sc">$</span><span class="fu">compute_tangents</span>())</span>
+<span id="cb2-12"><a href="#cb2-12" tabindex="-1"></a><span class="fu">print</span>(<span class="fu">paste</span>(<span class="st">&quot;Parallel (4 workers):&quot;</span>, <span class="fu">round</span>(time_par4[<span class="dv">3</span>], <span class="dv">2</span>), <span class="st">&quot;seconds&quot;</span>))</span>
+<span id="cb2-13"><a href="#cb2-13" tabindex="-1"></a><span class="fu">print</span>(<span class="fu">paste</span>(<span class="st">&quot;Speedup:&quot;</span>, <span class="fu">round</span>(time_seq[<span class="dv">3</span>] <span class="sc">/</span> time_par4[<span class="dv">3</span>], <span class="dv">2</span>), <span class="st">&quot;x&quot;</span>))</span>
+<span id="cb2-14"><a href="#cb2-14" tabindex="-1"></a></span>
+<span id="cb2-15"><a href="#cb2-15" tabindex="-1"></a><span class="co"># Parallel with 8 workers</span></span>
+<span id="cb2-16"><a href="#cb2-16" tabindex="-1"></a><span class="fu">set_parallel_plan</span>(<span class="st">&quot;multisession&quot;</span>, <span class="at">workers =</span> <span class="dv">8</span>)</span>
+<span id="cb2-17"><a href="#cb2-17" tabindex="-1"></a>time_par8 <span class="ot">&lt;-</span> <span class="fu">system.time</span>(sample<span class="sc">$</span><span class="fu">compute_tangents</span>())</span>
+<span id="cb2-18"><a href="#cb2-18" tabindex="-1"></a><span class="fu">print</span>(<span class="fu">paste</span>(<span class="st">&quot;Parallel (8 workers):&quot;</span>, <span class="fu">round</span>(time_par8[<span class="dv">3</span>], <span class="dv">2</span>), <span class="st">&quot;seconds&quot;</span>))</span>
+<span id="cb2-19"><a href="#cb2-19" tabindex="-1"></a><span class="fu">print</span>(<span class="fu">paste</span>(<span class="st">&quot;Speedup:&quot;</span>, <span class="fu">round</span>(time_seq[<span class="dv">3</span>] <span class="sc">/</span> time_par8[<span class="dv">3</span>], <span class="dv">2</span>), <span class="st">&quot;x&quot;</span>))</span>
+<span id="cb2-20"><a href="#cb2-20" tabindex="-1"></a></span>
+<span id="cb2-21"><a href="#cb2-21" tabindex="-1"></a><span class="co"># Reset</span></span>
+<span id="cb2-22"><a href="#cb2-22" tabindex="-1"></a><span class="fu">reset_parallel_plan</span>()</span></code></pre></div>
+<p><strong>Expected results</strong> (for n=100, p=50): - Sequential:
+~15-20 seconds - Parallel (4 workers): ~4-6 seconds (3-4x speedup) -
+Parallel (8 workers): ~2-3 seconds (6-8x speedup)</p>
+</div>
+<div id="frechet-mean-computation" class="section level3">
+<h3>Frechet Mean Computation</h3>
+<p>Benchmark Frechet mean computation with different sample sizes:</p>
+<div class="sourceCode" id="cb3"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" tabindex="-1"></a><span class="co"># Function to benchmark Frechet mean</span></span>
+<span id="cb3-2"><a href="#cb3-2" tabindex="-1"></a>benchmark_fmean <span class="ot">&lt;-</span> <span class="cf">function</span>(n, <span class="at">workers =</span> <span class="dv">1</span>) {</span>
+<span id="cb3-3"><a href="#cb3-3" tabindex="-1"></a>  conns_subset <span class="ot">&lt;-</span> connectomes[<span class="dv">1</span><span class="sc">:</span>n]</span>
+<span id="cb3-4"><a href="#cb3-4" tabindex="-1"></a>  sample <span class="ot">&lt;-</span> CSample<span class="sc">$</span><span class="fu">new</span>(<span class="at">conns =</span> conns_subset, <span class="at">metric_obj =</span> airm)</span>
+<span id="cb3-5"><a href="#cb3-5" tabindex="-1"></a></span>
+<span id="cb3-6"><a href="#cb3-6" tabindex="-1"></a>  <span class="cf">if</span> (workers <span class="sc">==</span> <span class="dv">1</span>) {</span>
+<span id="cb3-7"><a href="#cb3-7" tabindex="-1"></a>    <span class="fu">set_parallel_plan</span>(<span class="st">&quot;sequential&quot;</span>)</span>
+<span id="cb3-8"><a href="#cb3-8" tabindex="-1"></a>  } <span class="cf">else</span> {</span>
+<span id="cb3-9"><a href="#cb3-9" tabindex="-1"></a>    <span class="fu">set_parallel_plan</span>(<span class="st">&quot;multisession&quot;</span>, <span class="at">workers =</span> workers)</span>
+<span id="cb3-10"><a href="#cb3-10" tabindex="-1"></a>  }</span>
+<span id="cb3-11"><a href="#cb3-11" tabindex="-1"></a></span>
+<span id="cb3-12"><a href="#cb3-12" tabindex="-1"></a>  time <span class="ot">&lt;-</span> <span class="fu">system.time</span>(sample<span class="sc">$</span><span class="fu">compute_fmean</span>(<span class="at">tol =</span> <span class="fl">0.01</span>, <span class="at">max_iter =</span> <span class="dv">50</span>))</span>
+<span id="cb3-13"><a href="#cb3-13" tabindex="-1"></a>  <span class="fu">reset_parallel_plan</span>()</span>
+<span id="cb3-14"><a href="#cb3-14" tabindex="-1"></a></span>
+<span id="cb3-15"><a href="#cb3-15" tabindex="-1"></a>  time[<span class="dv">3</span>]</span>
+<span id="cb3-16"><a href="#cb3-16" tabindex="-1"></a>}</span>
+<span id="cb3-17"><a href="#cb3-17" tabindex="-1"></a></span>
+<span id="cb3-18"><a href="#cb3-18" tabindex="-1"></a><span class="co"># Benchmark different sample sizes</span></span>
+<span id="cb3-19"><a href="#cb3-19" tabindex="-1"></a>sample_sizes <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="dv">20</span>, <span class="dv">50</span>, <span class="dv">100</span>, <span class="dv">200</span>)</span>
+<span id="cb3-20"><a href="#cb3-20" tabindex="-1"></a>results <span class="ot">&lt;-</span> <span class="fu">data.frame</span>(</span>
+<span id="cb3-21"><a href="#cb3-21" tabindex="-1"></a>  <span class="at">n =</span> sample_sizes,</span>
+<span id="cb3-22"><a href="#cb3-22" tabindex="-1"></a>  <span class="at">sequential =</span> <span class="fu">sapply</span>(sample_sizes, benchmark_fmean, <span class="at">workers =</span> <span class="dv">1</span>),</span>
+<span id="cb3-23"><a href="#cb3-23" tabindex="-1"></a>  <span class="at">parallel_4 =</span> <span class="fu">sapply</span>(sample_sizes, benchmark_fmean, <span class="at">workers =</span> <span class="dv">4</span>),</span>
+<span id="cb3-24"><a href="#cb3-24" tabindex="-1"></a>  <span class="at">parallel_8 =</span> <span class="fu">sapply</span>(sample_sizes, benchmark_fmean, <span class="at">workers =</span> <span class="dv">8</span>)</span>
+<span id="cb3-25"><a href="#cb3-25" tabindex="-1"></a>)</span>
+<span id="cb3-26"><a href="#cb3-26" tabindex="-1"></a></span>
+<span id="cb3-27"><a href="#cb3-27" tabindex="-1"></a><span class="co"># Calculate speedups</span></span>
+<span id="cb3-28"><a href="#cb3-28" tabindex="-1"></a>results<span class="sc">$</span>speedup_4 <span class="ot">=</span> results<span class="sc">$</span>sequential <span class="sc">/</span> results<span class="sc">$</span>parallel_4</span>
+<span id="cb3-29"><a href="#cb3-29" tabindex="-1"></a>results<span class="sc">$</span>speedup_8 <span class="ot">=</span> results<span class="sc">$</span>sequential <span class="sc">/</span> results<span class="sc">$</span>parallel_8</span>
+<span id="cb3-30"><a href="#cb3-30" tabindex="-1"></a></span>
+<span id="cb3-31"><a href="#cb3-31" tabindex="-1"></a><span class="fu">print</span>(results)</span></code></pre></div>
+<p><strong>Expected speedup patterns</strong>: - Small samples (n &lt;
+50): Minimal benefit (overhead dominates) - Medium samples (n = 50-100):
+2-3x speedup - Large samples (n &gt; 100): 3-5x speedup</p>
+</div>
+<div id="parquet-io-benchmarks" class="section level3">
+<h3>Parquet I/O Benchmarks</h3>
+<p>Compare sequential vs parallel Parquet loading:</p>
+<div class="sourceCode" id="cb4"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" tabindex="-1"></a><span class="co"># Create Parquet dataset</span></span>
+<span id="cb4-2"><a href="#cb4-2" tabindex="-1"></a><span class="fu">write_connectomes_to_parquet</span>(</span>
+<span id="cb4-3"><a href="#cb4-3" tabindex="-1"></a>  connectomes,</span>
+<span id="cb4-4"><a href="#cb4-4" tabindex="-1"></a>  <span class="at">output_dir =</span> <span class="st">&quot;benchmark_data&quot;</span>,</span>
+<span id="cb4-5"><a href="#cb4-5" tabindex="-1"></a>  <span class="at">subject_ids =</span> <span class="fu">paste0</span>(<span class="st">&quot;subj_&quot;</span>, <span class="dv">1</span><span class="sc">:</span><span class="dv">100</span>)</span>
+<span id="cb4-6"><a href="#cb4-6" tabindex="-1"></a>)</span>
+<span id="cb4-7"><a href="#cb4-7" tabindex="-1"></a></span>
+<span id="cb4-8"><a href="#cb4-8" tabindex="-1"></a><span class="co"># Sequential loading</span></span>
+<span id="cb4-9"><a href="#cb4-9" tabindex="-1"></a>backend_seq <span class="ot">&lt;-</span> <span class="fu">create_parquet_backend</span>(<span class="st">&quot;benchmark_data&quot;</span>)</span>
+<span id="cb4-10"><a href="#cb4-10" tabindex="-1"></a><span class="fu">set_parallel_plan</span>(<span class="st">&quot;sequential&quot;</span>)</span>
+<span id="cb4-11"><a href="#cb4-11" tabindex="-1"></a>time_load_seq <span class="ot">&lt;-</span> <span class="fu">system.time</span>({</span>
+<span id="cb4-12"><a href="#cb4-12" tabindex="-1"></a>  conns <span class="ot">&lt;-</span> backend_seq<span class="sc">$</span><span class="fu">get_all_matrices</span>()</span>
+<span id="cb4-13"><a href="#cb4-13" tabindex="-1"></a>})</span>
+<span id="cb4-14"><a href="#cb4-14" tabindex="-1"></a></span>
+<span id="cb4-15"><a href="#cb4-15" tabindex="-1"></a><span class="co"># Parallel loading</span></span>
+<span id="cb4-16"><a href="#cb4-16" tabindex="-1"></a>backend_par <span class="ot">&lt;-</span> <span class="fu">create_parquet_backend</span>(<span class="st">&quot;benchmark_data&quot;</span>)</span>
+<span id="cb4-17"><a href="#cb4-17" tabindex="-1"></a><span class="fu">set_parallel_plan</span>(<span class="st">&quot;multisession&quot;</span>, <span class="at">workers =</span> <span class="dv">4</span>)</span>
+<span id="cb4-18"><a href="#cb4-18" tabindex="-1"></a>time_load_par <span class="ot">&lt;-</span> <span class="fu">system.time</span>({</span>
+<span id="cb4-19"><a href="#cb4-19" tabindex="-1"></a>  conns <span class="ot">&lt;-</span> backend_par<span class="sc">$</span><span class="fu">get_all_matrices</span>(<span class="at">parallel =</span> <span class="cn">TRUE</span>)</span>
+<span id="cb4-20"><a href="#cb4-20" tabindex="-1"></a>})</span>
+<span id="cb4-21"><a href="#cb4-21" tabindex="-1"></a></span>
+<span id="cb4-22"><a href="#cb4-22" tabindex="-1"></a><span class="fu">print</span>(<span class="fu">paste</span>(<span class="st">&quot;Sequential load:&quot;</span>, <span class="fu">round</span>(time_load_seq[<span class="dv">3</span>], <span class="dv">2</span>), <span class="st">&quot;seconds&quot;</span>))</span>
+<span id="cb4-23"><a href="#cb4-23" tabindex="-1"></a><span class="fu">print</span>(<span class="fu">paste</span>(<span class="st">&quot;Parallel load:&quot;</span>, <span class="fu">round</span>(time_load_par[<span class="dv">3</span>], <span class="dv">2</span>), <span class="st">&quot;seconds&quot;</span>))</span>
+<span id="cb4-24"><a href="#cb4-24" tabindex="-1"></a><span class="fu">print</span>(<span class="fu">paste</span>(<span class="st">&quot;Speedup:&quot;</span>, <span class="fu">round</span>(time_load_seq[<span class="dv">3</span>] <span class="sc">/</span> time_load_par[<span class="dv">3</span>], <span class="dv">2</span>), <span class="st">&quot;x&quot;</span>))</span>
+<span id="cb4-25"><a href="#cb4-25" tabindex="-1"></a></span>
+<span id="cb4-26"><a href="#cb4-26" tabindex="-1"></a><span class="co"># Cleanup</span></span>
+<span id="cb4-27"><a href="#cb4-27" tabindex="-1"></a><span class="fu">reset_parallel_plan</span>()</span>
+<span id="cb4-28"><a href="#cb4-28" tabindex="-1"></a><span class="fu">unlink</span>(<span class="st">&quot;benchmark_data&quot;</span>, <span class="at">recursive =</span> <span class="cn">TRUE</span>)</span></code></pre></div>
+<p><strong>Expected results</strong>: - Sequential: ~10-15 seconds -
+Parallel (4 workers): ~2-3 seconds (5-7x speedup)</p>
+</div>
+</div>
+<div id="scaling-analysis" class="section level2">
+<h2>Scaling Analysis</h2>
+<div id="worker-count-scaling" class="section level3">
+<h3>Worker Count Scaling</h3>
+<p>Test how performance scales with number of workers:</p>
+<div class="sourceCode" id="cb5"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" tabindex="-1"></a><span class="co"># Function to measure scaling</span></span>
+<span id="cb5-2"><a href="#cb5-2" tabindex="-1"></a>measure_scaling <span class="ot">&lt;-</span> <span class="cf">function</span>(workers_list) {</span>
+<span id="cb5-3"><a href="#cb5-3" tabindex="-1"></a>  sample <span class="ot">&lt;-</span> CSample<span class="sc">$</span><span class="fu">new</span>(<span class="at">conns =</span> connectomes, <span class="at">metric_obj =</span> airm)</span>
+<span id="cb5-4"><a href="#cb5-4" tabindex="-1"></a></span>
+<span id="cb5-5"><a href="#cb5-5" tabindex="-1"></a>  times <span class="ot">&lt;-</span> <span class="fu">sapply</span>(workers_list, <span class="cf">function</span>(w) {</span>
+<span id="cb5-6"><a href="#cb5-6" tabindex="-1"></a>    <span class="cf">if</span> (w <span class="sc">==</span> <span class="dv">1</span>) {</span>
+<span id="cb5-7"><a href="#cb5-7" tabindex="-1"></a>      <span class="fu">set_parallel_plan</span>(<span class="st">&quot;sequential&quot;</span>)</span>
+<span id="cb5-8"><a href="#cb5-8" tabindex="-1"></a>    } <span class="cf">else</span> {</span>
+<span id="cb5-9"><a href="#cb5-9" tabindex="-1"></a>      <span class="fu">set_parallel_plan</span>(<span class="st">&quot;multisession&quot;</span>, <span class="at">workers =</span> w)</span>
+<span id="cb5-10"><a href="#cb5-10" tabindex="-1"></a>    }</span>
+<span id="cb5-11"><a href="#cb5-11" tabindex="-1"></a></span>
+<span id="cb5-12"><a href="#cb5-12" tabindex="-1"></a>    time <span class="ot">&lt;-</span> <span class="fu">system.time</span>(sample<span class="sc">$</span><span class="fu">compute_tangents</span>())[<span class="dv">3</span>]</span>
+<span id="cb5-13"><a href="#cb5-13" tabindex="-1"></a>    <span class="fu">reset_parallel_plan</span>()</span>
+<span id="cb5-14"><a href="#cb5-14" tabindex="-1"></a>    time</span>
+<span id="cb5-15"><a href="#cb5-15" tabindex="-1"></a>  })</span>
+<span id="cb5-16"><a href="#cb5-16" tabindex="-1"></a></span>
+<span id="cb5-17"><a href="#cb5-17" tabindex="-1"></a>  <span class="fu">data.frame</span>(</span>
+<span id="cb5-18"><a href="#cb5-18" tabindex="-1"></a>    <span class="at">workers =</span> workers_list,</span>
+<span id="cb5-19"><a href="#cb5-19" tabindex="-1"></a>    <span class="at">time =</span> times,</span>
+<span id="cb5-20"><a href="#cb5-20" tabindex="-1"></a>    <span class="at">speedup =</span> times[<span class="dv">1</span>] <span class="sc">/</span> times,</span>
+<span id="cb5-21"><a href="#cb5-21" tabindex="-1"></a>    <span class="at">efficiency =</span> (times[<span class="dv">1</span>] <span class="sc">/</span> times) <span class="sc">/</span> workers_list <span class="sc">*</span> <span class="dv">100</span></span>
+<span id="cb5-22"><a href="#cb5-22" tabindex="-1"></a>  )</span>
+<span id="cb5-23"><a href="#cb5-23" tabindex="-1"></a>}</span>
+<span id="cb5-24"><a href="#cb5-24" tabindex="-1"></a></span>
+<span id="cb5-25"><a href="#cb5-25" tabindex="-1"></a><span class="co"># Test with different worker counts</span></span>
+<span id="cb5-26"><a href="#cb5-26" tabindex="-1"></a>workers <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="dv">1</span>, <span class="dv">2</span>, <span class="dv">4</span>, <span class="dv">8</span>)</span>
+<span id="cb5-27"><a href="#cb5-27" tabindex="-1"></a>scaling_results <span class="ot">&lt;-</span> <span class="fu">measure_scaling</span>(workers)</span>
+<span id="cb5-28"><a href="#cb5-28" tabindex="-1"></a></span>
+<span id="cb5-29"><a href="#cb5-29" tabindex="-1"></a><span class="fu">print</span>(scaling_results)</span>
+<span id="cb5-30"><a href="#cb5-30" tabindex="-1"></a></span>
+<span id="cb5-31"><a href="#cb5-31" tabindex="-1"></a><span class="co"># Plot scaling (if plotting package available)</span></span>
+<span id="cb5-32"><a href="#cb5-32" tabindex="-1"></a><span class="cf">if</span> (<span class="fu">requireNamespace</span>(<span class="st">&quot;ggplot2&quot;</span>, <span class="at">quietly =</span> <span class="cn">TRUE</span>)) {</span>
+<span id="cb5-33"><a href="#cb5-33" tabindex="-1"></a>  <span class="fu">library</span>(ggplot2)</span>
+<span id="cb5-34"><a href="#cb5-34" tabindex="-1"></a></span>
+<span id="cb5-35"><a href="#cb5-35" tabindex="-1"></a>  p <span class="ot">&lt;-</span> <span class="fu">ggplot</span>(scaling_results, <span class="fu">aes</span>(<span class="at">x =</span> workers, <span class="at">y =</span> speedup)) <span class="sc">+</span></span>
+<span id="cb5-36"><a href="#cb5-36" tabindex="-1"></a>    <span class="fu">geom_line</span>() <span class="sc">+</span></span>
+<span id="cb5-37"><a href="#cb5-37" tabindex="-1"></a>    <span class="fu">geom_point</span>(<span class="at">size =</span> <span class="dv">3</span>) <span class="sc">+</span></span>
+<span id="cb5-38"><a href="#cb5-38" tabindex="-1"></a>    <span class="fu">geom_abline</span>(<span class="at">slope =</span> <span class="dv">1</span>, <span class="at">intercept =</span> <span class="dv">0</span>, <span class="at">linetype =</span> <span class="st">&quot;dashed&quot;</span>, <span class="at">color =</span> <span class="st">&quot;red&quot;</span>) <span class="sc">+</span></span>
+<span id="cb5-39"><a href="#cb5-39" tabindex="-1"></a>    <span class="fu">labs</span>(</span>
+<span id="cb5-40"><a href="#cb5-40" tabindex="-1"></a>      <span class="at">title =</span> <span class="st">&quot;Parallel Scaling Performance&quot;</span>,</span>
+<span id="cb5-41"><a href="#cb5-41" tabindex="-1"></a>      <span class="at">x =</span> <span class="st">&quot;Number of Workers&quot;</span>,</span>
+<span id="cb5-42"><a href="#cb5-42" tabindex="-1"></a>      <span class="at">y =</span> <span class="st">&quot;Speedup&quot;</span>,</span>
+<span id="cb5-43"><a href="#cb5-43" tabindex="-1"></a>      <span class="at">subtitle =</span> <span class="st">&quot;Dashed line = ideal linear scaling&quot;</span></span>
+<span id="cb5-44"><a href="#cb5-44" tabindex="-1"></a>    ) <span class="sc">+</span></span>
+<span id="cb5-45"><a href="#cb5-45" tabindex="-1"></a>    <span class="fu">theme_minimal</span>()</span>
+<span id="cb5-46"><a href="#cb5-46" tabindex="-1"></a></span>
+<span id="cb5-47"><a href="#cb5-47" tabindex="-1"></a>  <span class="fu">print</span>(p)</span>
+<span id="cb5-48"><a href="#cb5-48" tabindex="-1"></a>}</span></code></pre></div>
+<p><strong>Interpretation</strong>: - <strong>Speedup</strong>:
+Time(sequential) / Time(parallel) - <strong>Efficiency</strong>: Speedup
+/ Workers × 100% - <strong>Ideal scaling</strong>: Speedup = Workers
+(efficiency = 100%) - <strong>Reality</strong>: Diminishing returns due
+to overhead (efficiency &lt; 100%)</p>
+</div>
+<div id="dataset-size-impact" class="section level3">
+<h3>Dataset Size Impact</h3>
+<p>Measure how parallelization benefit changes with dataset size:</p>
+<div class="sourceCode" id="cb6"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" tabindex="-1"></a><span class="co"># Test different dataset sizes</span></span>
+<span id="cb6-2"><a href="#cb6-2" tabindex="-1"></a>test_sizes <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="dv">10</span>, <span class="dv">25</span>, <span class="dv">50</span>, <span class="dv">100</span>, <span class="dv">200</span>)</span>
+<span id="cb6-3"><a href="#cb6-3" tabindex="-1"></a></span>
+<span id="cb6-4"><a href="#cb6-4" tabindex="-1"></a>size_benchmark <span class="ot">&lt;-</span> <span class="cf">function</span>(n) {</span>
+<span id="cb6-5"><a href="#cb6-5" tabindex="-1"></a>  conns_subset <span class="ot">&lt;-</span> <span class="fu">lapply</span>(<span class="dv">1</span><span class="sc">:</span>n, <span class="cf">function</span>(i) <span class="fu">create_spd_matrix</span>(<span class="dv">50</span>))</span>
+<span id="cb6-6"><a href="#cb6-6" tabindex="-1"></a>  sample <span class="ot">&lt;-</span> CSample<span class="sc">$</span><span class="fu">new</span>(<span class="at">conns =</span> conns_subset, <span class="at">metric_obj =</span> airm)</span>
+<span id="cb6-7"><a href="#cb6-7" tabindex="-1"></a></span>
+<span id="cb6-8"><a href="#cb6-8" tabindex="-1"></a>  <span class="co"># Sequential</span></span>
+<span id="cb6-9"><a href="#cb6-9" tabindex="-1"></a>  <span class="fu">set_parallel_plan</span>(<span class="st">&quot;sequential&quot;</span>)</span>
+<span id="cb6-10"><a href="#cb6-10" tabindex="-1"></a>  time_seq <span class="ot">&lt;-</span> <span class="fu">system.time</span>(sample<span class="sc">$</span><span class="fu">compute_tangents</span>())[<span class="dv">3</span>]</span>
+<span id="cb6-11"><a href="#cb6-11" tabindex="-1"></a></span>
+<span id="cb6-12"><a href="#cb6-12" tabindex="-1"></a>  <span class="co"># Parallel</span></span>
+<span id="cb6-13"><a href="#cb6-13" tabindex="-1"></a>  <span class="fu">set_parallel_plan</span>(<span class="st">&quot;multisession&quot;</span>, <span class="at">workers =</span> <span class="dv">4</span>)</span>
+<span id="cb6-14"><a href="#cb6-14" tabindex="-1"></a>  time_par <span class="ot">&lt;-</span> <span class="fu">system.time</span>(sample<span class="sc">$</span><span class="fu">compute_tangents</span>())[<span class="dv">3</span>]</span>
+<span id="cb6-15"><a href="#cb6-15" tabindex="-1"></a></span>
+<span id="cb6-16"><a href="#cb6-16" tabindex="-1"></a>  <span class="fu">reset_parallel_plan</span>()</span>
+<span id="cb6-17"><a href="#cb6-17" tabindex="-1"></a></span>
+<span id="cb6-18"><a href="#cb6-18" tabindex="-1"></a>  <span class="fu">c</span>(<span class="at">sequential =</span> time_seq, <span class="at">parallel =</span> time_par, <span class="at">speedup =</span> time_seq <span class="sc">/</span> time_par)</span>
+<span id="cb6-19"><a href="#cb6-19" tabindex="-1"></a>}</span>
+<span id="cb6-20"><a href="#cb6-20" tabindex="-1"></a></span>
+<span id="cb6-21"><a href="#cb6-21" tabindex="-1"></a>results_by_size <span class="ot">&lt;-</span> <span class="fu">t</span>(<span class="fu">sapply</span>(test_sizes, size_benchmark))</span>
+<span id="cb6-22"><a href="#cb6-22" tabindex="-1"></a>results_by_size <span class="ot">&lt;-</span> <span class="fu">data.frame</span>(<span class="at">n =</span> test_sizes, results_by_size)</span>
+<span id="cb6-23"><a href="#cb6-23" tabindex="-1"></a></span>
+<span id="cb6-24"><a href="#cb6-24" tabindex="-1"></a><span class="fu">print</span>(results_by_size)</span></code></pre></div>
+<p><strong>Expected pattern</strong>: - Small datasets (n &lt; 10):
+Speedup &lt; 1 (overhead penalty) - Medium datasets (n = 25-50): Speedup
+≈ 2-3 - Large datasets (n &gt; 100): Speedup ≈ 3-4 (approaches
+maximum)</p>
+</div>
+</div>
+<div id="optimization-guidelines" class="section level2">
+<h2>Optimization Guidelines</h2>
+<div id="when-to-use-parallel-processing" class="section level3">
+<h3>When to Use Parallel Processing</h3>
+<p><strong>Always beneficial</strong> (enable by default): - Large
+datasets (n ≥ 100 matrices) - High-dimensional matrices (p ≥ 100) -
+Repeated computations (multiple calls to compute methods)</p>
+<p><strong>Sometimes beneficial</strong> (test on your system): - Medium
+datasets (n = 25-100) - Medium-dimensional matrices (p = 50-100) -
+Single computations</p>
+<p><strong>Not beneficial</strong> (use sequential): - Small datasets (n
+&lt; 10) - Low-dimensional matrices (p &lt; 20) - Memory-constrained
+environments</p>
+</div>
+<div id="optimal-worker-count" class="section level3">
+<h3>Optimal Worker Count</h3>
+<div class="sourceCode" id="cb7"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" tabindex="-1"></a><span class="co"># Conservative (recommended for most users)</span></span>
+<span id="cb7-2"><a href="#cb7-2" tabindex="-1"></a>n_workers <span class="ot">&lt;-</span> parallel<span class="sc">::</span><span class="fu">detectCores</span>() <span class="sc">-</span> <span class="dv">1</span></span>
+<span id="cb7-3"><a href="#cb7-3" tabindex="-1"></a><span class="fu">set_parallel_plan</span>(<span class="st">&quot;multisession&quot;</span>, <span class="at">workers =</span> n_workers)</span>
+<span id="cb7-4"><a href="#cb7-4" tabindex="-1"></a></span>
+<span id="cb7-5"><a href="#cb7-5" tabindex="-1"></a><span class="co"># Aggressive (maximum performance, may slow system)</span></span>
+<span id="cb7-6"><a href="#cb7-6" tabindex="-1"></a>n_workers <span class="ot">&lt;-</span> parallel<span class="sc">::</span><span class="fu">detectCores</span>()</span>
+<span id="cb7-7"><a href="#cb7-7" tabindex="-1"></a><span class="fu">set_parallel_plan</span>(<span class="st">&quot;multisession&quot;</span>, <span class="at">workers =</span> n_workers)</span>
+<span id="cb7-8"><a href="#cb7-8" tabindex="-1"></a></span>
+<span id="cb7-9"><a href="#cb7-9" tabindex="-1"></a><span class="co"># Custom (based on benchmarking)</span></span>
+<span id="cb7-10"><a href="#cb7-10" tabindex="-1"></a><span class="co"># Test different worker counts and choose optimal</span></span></code></pre></div>
+<p><strong>Guidelines</strong>: - Leave 1-2 cores for system operations
+- More workers ≠ always faster (diminishing returns) - Test on your
+specific hardware and dataset - Consider memory: each worker needs its
+own data copy</p>
+</div>
+<div id="memory-optimization" class="section level3">
+<h3>Memory Optimization</h3>
+<div class="sourceCode" id="cb8"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" tabindex="-1"></a><span class="co"># For memory-constrained environments:</span></span>
+<span id="cb8-2"><a href="#cb8-2" tabindex="-1"></a></span>
+<span id="cb8-3"><a href="#cb8-3" tabindex="-1"></a><span class="co"># 1. Use Parquet backend with small cache</span></span>
+<span id="cb8-4"><a href="#cb8-4" tabindex="-1"></a>backend <span class="ot">&lt;-</span> <span class="fu">create_parquet_backend</span>(<span class="st">&quot;large_dataset&quot;</span>, <span class="at">cache_size =</span> <span class="dv">5</span>)</span>
+<span id="cb8-5"><a href="#cb8-5" tabindex="-1"></a></span>
+<span id="cb8-6"><a href="#cb8-6" tabindex="-1"></a><span class="co"># 2. Use moderate worker count</span></span>
+<span id="cb8-7"><a href="#cb8-7" tabindex="-1"></a><span class="fu">set_parallel_plan</span>(<span class="st">&quot;multisession&quot;</span>, <span class="at">workers =</span> <span class="dv">2</span>)</span>
+<span id="cb8-8"><a href="#cb8-8" tabindex="-1"></a></span>
+<span id="cb8-9"><a href="#cb8-9" tabindex="-1"></a><span class="co"># 3. Use batch loading for very large datasets</span></span>
+<span id="cb8-10"><a href="#cb8-10" tabindex="-1"></a>sample <span class="ot">&lt;-</span> CSample<span class="sc">$</span><span class="fu">new</span>(<span class="at">backend =</span> backend, <span class="at">metric_obj =</span> airm)</span>
+<span id="cb8-11"><a href="#cb8-11" tabindex="-1"></a>conns_batch <span class="ot">&lt;-</span> sample<span class="sc">$</span><span class="fu">load_connectomes_batched</span>(</span>
+<span id="cb8-12"><a href="#cb8-12" tabindex="-1"></a>  <span class="at">indices =</span> <span class="dv">1</span><span class="sc">:</span><span class="dv">500</span>,</span>
+<span id="cb8-13"><a href="#cb8-13" tabindex="-1"></a>  <span class="at">batch_size =</span> <span class="dv">50</span>,   <span class="co"># Small batches</span></span>
+<span id="cb8-14"><a href="#cb8-14" tabindex="-1"></a>  <span class="at">progress =</span> <span class="cn">TRUE</span></span>
+<span id="cb8-15"><a href="#cb8-15" tabindex="-1"></a>)</span>
+<span id="cb8-16"><a href="#cb8-16" tabindex="-1"></a></span>
+<span id="cb8-17"><a href="#cb8-17" tabindex="-1"></a><span class="co"># 4. Clear cache frequently</span></span>
+<span id="cb8-18"><a href="#cb8-18" tabindex="-1"></a>backend<span class="sc">$</span><span class="fu">clear_cache</span>()</span></code></pre></div>
+</div>
+<div id="progress-reporting-overhead" class="section level3">
+<h3>Progress Reporting Overhead</h3>
+<p>Progress reporting adds small overhead (~1-5%):</p>
+<div class="sourceCode" id="cb9"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" tabindex="-1"></a><span class="co"># With progress (slightly slower)</span></span>
+<span id="cb9-2"><a href="#cb9-2" tabindex="-1"></a><span class="fu">set_parallel_plan</span>(<span class="st">&quot;multisession&quot;</span>, <span class="at">workers =</span> <span class="dv">4</span>)</span>
+<span id="cb9-3"><a href="#cb9-3" tabindex="-1"></a>time_with_progress <span class="ot">&lt;-</span> <span class="fu">system.time</span>({</span>
+<span id="cb9-4"><a href="#cb9-4" tabindex="-1"></a>  sample<span class="sc">$</span><span class="fu">compute_tangents</span>(<span class="at">progress =</span> <span class="cn">TRUE</span>)</span>
+<span id="cb9-5"><a href="#cb9-5" tabindex="-1"></a>})[<span class="dv">3</span>]</span>
+<span id="cb9-6"><a href="#cb9-6" tabindex="-1"></a></span>
+<span id="cb9-7"><a href="#cb9-7" tabindex="-1"></a><span class="co"># Without progress (slightly faster)</span></span>
+<span id="cb9-8"><a href="#cb9-8" tabindex="-1"></a>time_no_progress <span class="ot">&lt;-</span> <span class="fu">system.time</span>({</span>
+<span id="cb9-9"><a href="#cb9-9" tabindex="-1"></a>  sample<span class="sc">$</span><span class="fu">compute_tangents</span>(<span class="at">progress =</span> <span class="cn">FALSE</span>)</span>
+<span id="cb9-10"><a href="#cb9-10" tabindex="-1"></a>})[<span class="dv">3</span>]</span>
+<span id="cb9-11"><a href="#cb9-11" tabindex="-1"></a></span>
+<span id="cb9-12"><a href="#cb9-12" tabindex="-1"></a>overhead <span class="ot">&lt;-</span> (time_with_progress <span class="sc">-</span> time_no_progress) <span class="sc">/</span> time_no_progress <span class="sc">*</span> <span class="dv">100</span></span>
+<span id="cb9-13"><a href="#cb9-13" tabindex="-1"></a><span class="fu">print</span>(<span class="fu">paste</span>(<span class="st">&quot;Progress overhead:&quot;</span>, <span class="fu">round</span>(overhead, <span class="dv">1</span>), <span class="st">&quot;%&quot;</span>))</span></code></pre></div>
+<p><strong>Recommendation</strong>: Use progress for long-running
+operations (&gt;10 seconds), disable for fast operations.</p>
+</div>
+</div>
+<div id="benchmarking-best-practices" class="section level2">
+<h2>Benchmarking Best Practices</h2>
+<div id="use-microbenchmark-for-accurate-measurements" class="section level3">
+<h3>1. Use microbenchmark for Accurate Measurements</h3>
+<div class="sourceCode" id="cb10"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1" tabindex="-1"></a><span class="fu">library</span>(microbenchmark)</span>
+<span id="cb10-2"><a href="#cb10-2" tabindex="-1"></a></span>
+<span id="cb10-3"><a href="#cb10-3" tabindex="-1"></a><span class="co"># Run multiple times to get stable estimates</span></span>
+<span id="cb10-4"><a href="#cb10-4" tabindex="-1"></a>mb_result <span class="ot">&lt;-</span> <span class="fu">microbenchmark</span>(</span>
+<span id="cb10-5"><a href="#cb10-5" tabindex="-1"></a>  <span class="at">sequential =</span> {</span>
+<span id="cb10-6"><a href="#cb10-6" tabindex="-1"></a>    <span class="fu">set_parallel_plan</span>(<span class="st">&quot;sequential&quot;</span>)</span>
+<span id="cb10-7"><a href="#cb10-7" tabindex="-1"></a>    sample<span class="sc">$</span><span class="fu">compute_tangents</span>()</span>
+<span id="cb10-8"><a href="#cb10-8" tabindex="-1"></a>  },</span>
+<span id="cb10-9"><a href="#cb10-9" tabindex="-1"></a>  <span class="at">parallel_4 =</span> {</span>
+<span id="cb10-10"><a href="#cb10-10" tabindex="-1"></a>    <span class="fu">set_parallel_plan</span>(<span class="st">&quot;multisession&quot;</span>, <span class="at">workers =</span> <span class="dv">4</span>)</span>
+<span id="cb10-11"><a href="#cb10-11" tabindex="-1"></a>    sample<span class="sc">$</span><span class="fu">compute_tangents</span>()</span>
+<span id="cb10-12"><a href="#cb10-12" tabindex="-1"></a>  },</span>
+<span id="cb10-13"><a href="#cb10-13" tabindex="-1"></a>  <span class="at">times =</span> <span class="dv">10</span>  <span class="co"># Run 10 times each</span></span>
+<span id="cb10-14"><a href="#cb10-14" tabindex="-1"></a>)</span>
+<span id="cb10-15"><a href="#cb10-15" tabindex="-1"></a></span>
+<span id="cb10-16"><a href="#cb10-16" tabindex="-1"></a><span class="fu">print</span>(mb_result)</span>
+<span id="cb10-17"><a href="#cb10-17" tabindex="-1"></a><span class="fu">plot</span>(mb_result)</span></code></pre></div>
+</div>
+<div id="control-for-caching-effects" class="section level3">
+<h3>2. Control for Caching Effects</h3>
+<div class="sourceCode" id="cb11"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb11-1"><a href="#cb11-1" tabindex="-1"></a><span class="co"># Clear any caches between runs</span></span>
+<span id="cb11-2"><a href="#cb11-2" tabindex="-1"></a>sample <span class="ot">&lt;-</span> CSample<span class="sc">$</span><span class="fu">new</span>(<span class="at">conns =</span> connectomes, <span class="at">metric_obj =</span> airm)</span>
+<span id="cb11-3"><a href="#cb11-3" tabindex="-1"></a></span>
+<span id="cb11-4"><a href="#cb11-4" tabindex="-1"></a><span class="co"># Warm up (first run may be slower)</span></span>
+<span id="cb11-5"><a href="#cb11-5" tabindex="-1"></a>sample<span class="sc">$</span><span class="fu">compute_tangents</span>()</span>
+<span id="cb11-6"><a href="#cb11-6" tabindex="-1"></a></span>
+<span id="cb11-7"><a href="#cb11-7" tabindex="-1"></a><span class="co"># Now benchmark</span></span>
+<span id="cb11-8"><a href="#cb11-8" tabindex="-1"></a>time <span class="ot">&lt;-</span> <span class="fu">system.time</span>(sample<span class="sc">$</span><span class="fu">compute_tangents</span>())[<span class="dv">3</span>]</span></code></pre></div>
+</div>
+<div id="report-system-information" class="section level3">
+<h3>3. Report System Information</h3>
+<div class="sourceCode" id="cb12"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb12-1"><a href="#cb12-1" tabindex="-1"></a><span class="co"># Record system specs with benchmarks</span></span>
+<span id="cb12-2"><a href="#cb12-2" tabindex="-1"></a>system_info <span class="ot">&lt;-</span> <span class="fu">list</span>(</span>
+<span id="cb12-3"><a href="#cb12-3" tabindex="-1"></a>  <span class="at">cores =</span> parallel<span class="sc">::</span><span class="fu">detectCores</span>(),</span>
+<span id="cb12-4"><a href="#cb12-4" tabindex="-1"></a>  <span class="at">memory =</span> <span class="fu">as.numeric</span>(<span class="fu">system</span>(<span class="st">&quot;wmic ComputerSystem get TotalPhysicalMemory&quot;</span>, <span class="at">intern =</span> <span class="cn">TRUE</span>)[<span class="dv">2</span>]) <span class="sc">/</span> <span class="fl">1e9</span>,</span>
+<span id="cb12-5"><a href="#cb12-5" tabindex="-1"></a>  <span class="at">r_version =</span> R.version.string,</span>
+<span id="cb12-6"><a href="#cb12-6" tabindex="-1"></a>  <span class="at">riemtan_version =</span> <span class="fu">packageVersion</span>(<span class="st">&quot;riemtan&quot;</span>),</span>
+<span id="cb12-7"><a href="#cb12-7" tabindex="-1"></a>  <span class="at">os =</span> <span class="fu">Sys.info</span>()[<span class="st">&quot;sysname&quot;</span>]</span>
+<span id="cb12-8"><a href="#cb12-8" tabindex="-1"></a>)</span>
+<span id="cb12-9"><a href="#cb12-9" tabindex="-1"></a></span>
+<span id="cb12-10"><a href="#cb12-10" tabindex="-1"></a><span class="fu">print</span>(system_info)</span></code></pre></div>
+</div>
+</div>
+<div id="common-performance-patterns" class="section level2">
+<h2>Common Performance Patterns</h2>
+<div id="pattern-1-compute-bound-operations" class="section level3">
+<h3>Pattern 1: Compute-Bound Operations</h3>
+<p>Tangent computations, vectorizations scale well:</p>
+<div class="sourceCode" id="cb13"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb13-1"><a href="#cb13-1" tabindex="-1"></a><span class="co"># Expect near-linear scaling up to physical cores</span></span>
+<span id="cb13-2"><a href="#cb13-2" tabindex="-1"></a><span class="fu">set_parallel_plan</span>(<span class="st">&quot;multisession&quot;</span>, <span class="at">workers =</span> <span class="dv">4</span>)</span>
+<span id="cb13-3"><a href="#cb13-3" tabindex="-1"></a>sample<span class="sc">$</span><span class="fu">compute_tangents</span>()  <span class="co"># 3-4x speedup</span></span>
+<span id="cb13-4"><a href="#cb13-4" tabindex="-1"></a>sample<span class="sc">$</span><span class="fu">compute_vecs</span>()       <span class="co"># 2-4x speedup</span></span>
+<span id="cb13-5"><a href="#cb13-5" tabindex="-1"></a>sample<span class="sc">$</span><span class="fu">compute_conns</span>()      <span class="co"># 3-4x speedup</span></span></code></pre></div>
+</div>
+<div id="pattern-2-iteration-heavy-operations" class="section level3">
+<h3>Pattern 2: Iteration-Heavy Operations</h3>
+<p>Frechet mean has sub-linear scaling (synchronization overhead):</p>
+<div class="sourceCode" id="cb14"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb14-1"><a href="#cb14-1" tabindex="-1"></a><span class="co"># Expect 2-3x speedup (less than compute-bound)</span></span>
+<span id="cb14-2"><a href="#cb14-2" tabindex="-1"></a><span class="fu">set_parallel_plan</span>(<span class="st">&quot;multisession&quot;</span>, <span class="at">workers =</span> <span class="dv">4</span>)</span>
+<span id="cb14-3"><a href="#cb14-3" tabindex="-1"></a>sample<span class="sc">$</span><span class="fu">compute_fmean</span>()  <span class="co"># 2-3x speedup</span></span></code></pre></div>
+</div>
+<div id="pattern-3-io-bound-operations" class="section level3">
+<h3>Pattern 3: I/O-Bound Operations</h3>
+<p>Parquet loading can super-scale (disk parallelism):</p>
+<div class="sourceCode" id="cb15"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb15-1"><a href="#cb15-1" tabindex="-1"></a><span class="co"># May see &gt;4x speedup with 4 workers (parallel disk I/O)</span></span>
+<span id="cb15-2"><a href="#cb15-2" tabindex="-1"></a>backend <span class="ot">&lt;-</span> <span class="fu">create_parquet_backend</span>(<span class="st">&quot;dataset&quot;</span>)</span>
+<span id="cb15-3"><a href="#cb15-3" tabindex="-1"></a><span class="fu">set_parallel_plan</span>(<span class="st">&quot;multisession&quot;</span>, <span class="at">workers =</span> <span class="dv">4</span>)</span>
+<span id="cb15-4"><a href="#cb15-4" tabindex="-1"></a>conns <span class="ot">&lt;-</span> backend<span class="sc">$</span><span class="fu">get_all_matrices</span>(<span class="at">parallel =</span> <span class="cn">TRUE</span>)  <span class="co"># 5-10x speedup</span></span></code></pre></div>
+</div>
+</div>
+<div id="platform-specific-notes" class="section level2">
+<h2>Platform-Specific Notes</h2>
+<div id="windows" class="section level3">
+<h3>Windows</h3>
+<div class="sourceCode" id="cb16"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb16-1"><a href="#cb16-1" tabindex="-1"></a><span class="co"># Use multisession (multicore not available)</span></span>
+<span id="cb16-2"><a href="#cb16-2" tabindex="-1"></a><span class="fu">set_parallel_plan</span>(<span class="st">&quot;multisession&quot;</span>, <span class="at">workers =</span> <span class="dv">4</span>)</span>
+<span id="cb16-3"><a href="#cb16-3" tabindex="-1"></a></span>
+<span id="cb16-4"><a href="#cb16-4" tabindex="-1"></a><span class="co"># Expect slightly higher overhead than Unix</span></span>
+<span id="cb16-5"><a href="#cb16-5" tabindex="-1"></a><span class="co"># Typical speedup: 70-80% of Unix performance</span></span></code></pre></div>
+</div>
+<div id="maclinux" class="section level3">
+<h3>Mac/Linux</h3>
+<div class="sourceCode" id="cb17"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb17-1"><a href="#cb17-1" tabindex="-1"></a><span class="co"># Can use multicore for lower overhead</span></span>
+<span id="cb17-2"><a href="#cb17-2" tabindex="-1"></a><span class="fu">set_parallel_plan</span>(<span class="st">&quot;multicore&quot;</span>, <span class="at">workers =</span> <span class="dv">4</span>)</span>
+<span id="cb17-3"><a href="#cb17-3" tabindex="-1"></a></span>
+<span id="cb17-4"><a href="#cb17-4" tabindex="-1"></a><span class="co"># Or multisession for better stability</span></span>
+<span id="cb17-5"><a href="#cb17-5" tabindex="-1"></a><span class="fu">set_parallel_plan</span>(<span class="st">&quot;multisession&quot;</span>, <span class="at">workers =</span> <span class="dv">4</span>)</span></code></pre></div>
+</div>
+<div id="hpc-clusters" class="section level3">
+<h3>HPC Clusters</h3>
+<div class="sourceCode" id="cb18"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb18-1"><a href="#cb18-1" tabindex="-1"></a><span class="co"># Use cluster strategy for distributed computing</span></span>
+<span id="cb18-2"><a href="#cb18-2" tabindex="-1"></a><span class="fu">library</span>(future)</span>
+<span id="cb18-3"><a href="#cb18-3" tabindex="-1"></a><span class="fu">plan</span>(cluster, <span class="at">workers =</span> <span class="fu">c</span>(<span class="st">&quot;node1&quot;</span>, <span class="st">&quot;node2&quot;</span>, <span class="st">&quot;node3&quot;</span>, <span class="st">&quot;node4&quot;</span>))</span>
+<span id="cb18-4"><a href="#cb18-4" tabindex="-1"></a></span>
+<span id="cb18-5"><a href="#cb18-5" tabindex="-1"></a><span class="co"># Or use batchtools for SLURM integration</span></span>
+<span id="cb18-6"><a href="#cb18-6" tabindex="-1"></a><span class="fu">library</span>(future.batchtools)</span>
+<span id="cb18-7"><a href="#cb18-7" tabindex="-1"></a><span class="fu">plan</span>(batchtools_slurm, <span class="at">workers =</span> <span class="dv">16</span>)</span></code></pre></div>
+</div>
+</div>
+<div id="summary" class="section level2">
+<h2>Summary</h2>
+<p><strong>Key Takeaways</strong>:</p>
+<ol style="list-style-type: decimal">
+<li><strong>Enable parallelization for large datasets</strong>: n ≥ 100
+or p ≥ 100</li>
+<li><strong>Use conservative worker count</strong>:
+<code>parallel::detectCores() - 1</code></li>
+<li><strong>Expect 3-8x speedup</strong> for compute-bound
+operations</li>
+<li><strong>Use Parquet + parallel I/O</strong> for maximum
+performance</li>
+<li><strong>Benchmark on your system</strong>: Performance varies by
+hardware</li>
+<li><strong>Reset plan when done</strong>:
+<code>reset_parallel_plan()</code></li>
+</ol>
+<p><strong>Typical Workflow</strong>:</p>
+<div class="sourceCode" id="cb19"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb19-1"><a href="#cb19-1" tabindex="-1"></a><span class="co"># Setup</span></span>
+<span id="cb19-2"><a href="#cb19-2" tabindex="-1"></a><span class="fu">library</span>(riemtan)</span>
+<span id="cb19-3"><a href="#cb19-3" tabindex="-1"></a><span class="fu">set_parallel_plan</span>(<span class="st">&quot;multisession&quot;</span>, <span class="at">workers =</span> parallel<span class="sc">::</span><span class="fu">detectCores</span>() <span class="sc">-</span> <span class="dv">1</span>)</span>
+<span id="cb19-4"><a href="#cb19-4" tabindex="-1"></a></span>
+<span id="cb19-5"><a href="#cb19-5" tabindex="-1"></a><span class="co"># Load data</span></span>
+<span id="cb19-6"><a href="#cb19-6" tabindex="-1"></a>backend <span class="ot">&lt;-</span> <span class="fu">create_parquet_backend</span>(<span class="st">&quot;large_dataset&quot;</span>)</span>
+<span id="cb19-7"><a href="#cb19-7" tabindex="-1"></a>sample <span class="ot">&lt;-</span> CSample<span class="sc">$</span><span class="fu">new</span>(<span class="at">backend =</span> backend, <span class="at">metric_obj =</span> airm)</span>
+<span id="cb19-8"><a href="#cb19-8" tabindex="-1"></a></span>
+<span id="cb19-9"><a href="#cb19-9" tabindex="-1"></a><span class="co"># Compute with progress</span></span>
+<span id="cb19-10"><a href="#cb19-10" tabindex="-1"></a>sample<span class="sc">$</span><span class="fu">compute_tangents</span>(<span class="at">progress =</span> <span class="cn">TRUE</span>)</span>
+<span id="cb19-11"><a href="#cb19-11" tabindex="-1"></a>sample<span class="sc">$</span><span class="fu">compute_fmean</span>(<span class="at">progress =</span> <span class="cn">TRUE</span>)</span>
+<span id="cb19-12"><a href="#cb19-12" tabindex="-1"></a></span>
+<span id="cb19-13"><a href="#cb19-13" tabindex="-1"></a><span class="co"># Cleanup</span></span>
+<span id="cb19-14"><a href="#cb19-14" tabindex="-1"></a><span class="fu">reset_parallel_plan</span>()</span></code></pre></div>
+<p>For more details, see: - <a href="using-parquet.html">Using Parquet
+Storage vignette</a> - <a href="https://future.futureverse.org/">futureverse documentation</a> -
+<a href="https://nicoesve.github.io/riemtan/">riemtan package
+documentation</a></p>
+</div>
+
+
+
+<!-- code folding -->
+
+
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+  (function () {
+    var script = document.createElement("script");
+    script.type = "text/javascript";
+    script.src  = "https://mathjax.rstudio.com/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML";
+    document.getElementsByTagName("head")[0].appendChild(script);
+  })();
+</script>
+
+</body>
+</html>

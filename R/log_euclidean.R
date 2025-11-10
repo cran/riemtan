@@ -2,25 +2,26 @@
 #'
 #' @param sigma A reference point.
 #' @param lambda A point on the manifold.
+#' @param validate A logical value indicating whether to validate input arguments. Default is FALSE.
 #'
 #' @return The tangent space image of `lambda` at `sigma`.
 #' @export
-log_euclidean_log <- function(sigma, lambda) {
-  validate_log_args(sigma, lambda)
+log_euclidean_log <- function(sigma, lambda, validate = FALSE) {
+  if (validate) {
+    validate_log_args(sigma, lambda)
+  }
 
-  aux_matr_1 <- sigma |> safe_logm()
-  aux_matr_2 <- lambda |> safe_logm()
-
-  aux_matr_3 <- aux_matr_2 - aux_matr_1
-
-  aux_matr_1 <- aux_matr_1 |>
+  # Convert to dense matrices for C++ computation
+  sigma_mat <- as.matrix(sigma)
+  lambda_mat <- as.matrix(lambda)
+  
+  # Call C++ implementation
+  result <- log_euclidean_log_cpp(sigma_mat, lambda_mat)
+  
+  # Convert back to symmetric packed format
+  result |>
     Matrix::symmpart() |>
     Matrix::pack()
-  aux_matr_3 <- aux_matr_3 |>
-    Matrix::symmpart() |>
-    Matrix::pack()
-
-  dexp(aux_matr_1, aux_matr_3)
 }
 
 #' Compute the Log-Euclidean Exponential
@@ -29,23 +30,24 @@ log_euclidean_log <- function(sigma, lambda) {
 #'
 #' @param ref_pt A reference point.
 #' @param v A tangent vector to be mapped back to the manifold at `ref_pt`.
+#' @param validate A logical value indicating whether to validate input arguments. Default is FALSE.
 #'
 #' @return The point on the manifold corresponding to the tangent vector at `ref_pt`.
 #' @export
-log_euclidean_exp <- function(ref_pt, v) {
-  validate_exp_args(ref_pt, v)
+log_euclidean_exp <- function(ref_pt, v, validate = FALSE) {
+  if (validate) {
+    validate_exp_args(ref_pt, v)
+  }
 
-  # compute the functions that compose the exponential
-  aux_matr_1 <- ref_pt |>
-    as.matrix() |>
-    expm::logm()
-  aux_matr_2 <- v |>
-    (\(x) dlog(ref_pt, x))()
-
-  aux_matr_3 <- aux_matr_1 + aux_matr_2
-
-  aux_matr_3 |>
-    expm::expm(method = "hybrid_Eigen_Ward") |>
+  # Convert to dense matrices for C++ computation
+  ref_pt_mat <- as.matrix(ref_pt)
+  v_mat <- as.matrix(v)
+  
+  # Call C++ implementation
+  result <- log_euclidean_exp_cpp(ref_pt_mat, v_mat)
+  
+  # Ensure positive definiteness and convert to packed format
+  result |>
     Matrix::nearPD() |>
     _$mat |>
     Matrix::pack()

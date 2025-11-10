@@ -4,7 +4,14 @@
 \alias{compute_frechet_mean}
 \title{Compute the Frechet Mean}
 \usage{
-compute_frechet_mean(sample, tol = 0.05, max_iter = 20, lr = 0.2)
+compute_frechet_mean(
+  sample,
+  tol = 0.05,
+  max_iter = 20,
+  lr = 0.2,
+  batch_size = 32,
+  progress = FALSE
+)
 }
 \arguments{
 \item{sample}{An object of class \code{CSample} containing the sample data.}
@@ -14,15 +21,25 @@ compute_frechet_mean(sample, tol = 0.05, max_iter = 20, lr = 0.2)
 \item{max_iter}{An integer specifying the maximum number of iterations. Default is 20.}
 
 \item{lr}{A numeric value specifying the learning rate. Default is 0.2.}
+
+\item{batch_size}{Integer. The number of samples to process in each batch during computation. Default is 32.}
+
+\item{progress}{Logical indicating whether to show progress during computation (default: FALSE). Requires progressr package.}
 }
 \value{
-The computed Frechet mean.
+The computed Frechet mean as a dppMatrix object.
 }
 \description{
-This function computes the Frechet mean of a sample using an iterative algorithm.
+This function computes the Frechet mean of a sample using an iterative algorithm with optional parallel processing.
 }
 \details{
-The function iteratively updates the reference point of the sample until the change in the reference point is less than the specified tolerance or the maximum number of iterations is reached. If the tangent images are not already computed, they will be computed before starting the iterations.
+The function iteratively updates the reference point of the sample until the change in the reference point
+is less than the specified tolerance or the maximum number of iterations is reached. If the tangent images
+are not already computed, they will be computed before starting the iterations.
+
+When parallel processing is enabled (via \code{\link[=set_parallel_plan]{set_parallel_plan()}}), the \code{relocate()} function will use parallel
+processing for relocating tangent images in each iteration, which can significantly speed up computation
+for large samples.
 }
 \examples{
 if (requireNamespace("Matrix", quietly = TRUE)) {

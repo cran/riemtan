@@ -55,13 +55,20 @@ rspdnorm <- function(n, refpt, disp, met) {
 #' Relocate Tangent Representations to a New Reference Point
 #'
 #' Changes the reference point for tangent space representations on a Riemannian manifold.
+#' Supports parallel processing via the futureverse framework for improved performance on large datasets.
 #'
 #' @param old_ref A reference point on the manifold to be replaced. Must be an object of class `dppMatrix` from the Matrix package.
 #' @param new_ref The new reference point on the manifold. Must be an object of class `dppMatrix` from the Matrix package.
 #' @param images A list of tangent representations relative to the old reference point. Each element in the list must be an object of class `dspMatrix`.
 #' @param met A metric object of class `rmetric`, containing functions for Riemannian operations (logarithmic map, exponential map, vectorization, and inverse vectorization).
+#' @param progress Logical indicating whether to show progress during computation (default: FALSE). Requires progressr package.
 #'
 #' @return A list of tangent representations relative to the new reference point. Each element in the returned list will be an object of class `dspMatrix`.
+#'
+#' @details
+#' This function uses parallel processing when the number of images exceeds a threshold and
+#' parallel processing is enabled via [set_parallel_plan()]. For small datasets, sequential
+#' processing is used automatically to avoid parallelization overhead.
 #' @examples
 #' if (requireNamespace("Matrix", quietly = TRUE)) {
 #'   library(Matrix)
@@ -81,23 +88,53 @@ rspdnorm <- function(n, refpt, disp, met) {
 #'   relocate(old_ref, new_ref, images, airm)
 #' }
 #' @export
-relocate <- function(old_ref, new_ref, images, met) {
-  images |> furrr::future_map(
-    \(tan) met$exp(old_ref, tan) |> met$log(sigma = new_ref, lambda = _)
-  )
+relocate <- function(old_ref, new_ref, images, met, progress = FALSE) {
+  # Function to relocate a single image
+  relocate_single <- function(tan) {
+    met$exp(old_ref, tan) |> met$log(sigma = new_ref, lambda = _)
+  }
+
+  n <- length(images)
+
+  # Use futureverse for cross-platform parallel processing
+  if (should_parallelize(n)) {
+    with_progress({
+      p <- create_progressor(n, enable = progress)
+      furrr::future_map(
+        images,
+        \(tan) {
+          result <- relocate_single(tan)
+          p()
+          result
+        },
+        .options = furrr::furrr_options(seed = TRUE)
+      )
+    }, name = "Relocating tangent images", enable = progress)
+  } else {
+    # Sequential processing for small datasets
+    lapply(images, relocate_single)
+  }
 }
 
 #' Compute the Frechet Mean
 #'
-#' This function computes the Frechet mean of a sample using an iterative algorithm.
+#' This function computes the Frechet mean of a sample using an iterative algorithm with optional parallel processing.
 #'
 #' @param sample An object of class `CSample` containing the sample data.
 #' @param tol A numeric value specifying the tolerance for convergence. Default is 0.05.
 #' @param max_iter An integer specifying the maximum number of iterations. Default is 20.
 #' @param lr A numeric value specifying the learning rate. Default is 0.2.
-#' @return The computed Frechet mean.
+#' @param batch_size Integer. The number of samples to process in each batch during computation. Default is 32.
+#' @param progress Logical indicating whether to show progress during computation (default: FALSE). Requires progressr package.
+#' @return The computed Frechet mean as a dppMatrix object.
 #' @details
-#' The function iteratively updates the reference point of the sample until the change in the reference point is less than the specified tolerance or the maximum number of iterations is reached. If the tangent images are not already computed, they will be computed before starting the iterations.
+#' The function iteratively updates the reference point of the sample until the change in the reference point
+#' is less than the specified tolerance or the maximum number of iterations is reached. If the tangent images
+#' are not already computed, they will be computed before starting the iterations.
+#'
+#' When parallel processing is enabled (via [set_parallel_plan()]), the `relocate()` function will use parallel
+#' processing for relocating tangent images in each iteration, which can significantly speed up computation
+#' for large samples.
 #' @examples
 #' if (requireNamespace("Matrix", quietly = TRUE)) {
 #'   library(Matrix)
@@ -113,57 +150,88 @@ relocate <- function(old_ref, new_ref, images, met) {
 #'   compute_frechet_mean(sample, tol = 0.01, max_iter = 50, lr = 0.1)
 #' }
 #' @export
-compute_frechet_mean <- function(sample, tol = 0.05, max_iter = 20, lr = 0.2) {
-  # Validating parameters
-  if (!is.null(sample$frechet_mean)) {
-    warning("The Frechet mean has already been computed.")
-  }
-  if (length(sample$tangent_images) == 0) {
-    message("tangent images were null, so they will be computed")
-    sample$compute_tangents()
-  }
-  if (!is.numeric(tol)) stop("tol must be a numeric.")
-  if (max_iter < 1) stop("max_iter must be at least 1.")
-
-  aux_sample <- sample
-  delta <- Inf
-  iter <- 0
-
-  while ((delta > tol) && (iter < max_iter)) {
-    old_tan <- aux_sample$tangent_images
-    iter <- iter + 1
-    old_ref_pt <- aux_sample$ref_point
-
-    if (iter > max_iter) {
-      warning("Computation of Frechet mean exceeded maximum
-                number of iterations.")
+compute_frechet_mean <-
+  function(sample, tol = 0.05, max_iter = 20, lr = 0.2, batch_size = 32, progress = FALSE) {
+    # Validating parameters
+    if (!is.null(sample$frechet_mean)) {
+      warning("The Frechet mean has already been computed.")
+    }
+    if (length(sample$tangent_images) == 0) {
+      message("tangent images were null, so they will be computed")
+      # Check if we have connectomes, otherwise use vector images
+      if (!is.null(sample$connectomes)) {
+        sample$compute_tangents()
+      } else if (!is.null(sample$vector_images)) {
+        sample$compute_unvecs()
+      } else {
+        stop("Cannot compute tangent images: no connectomes or vector images available.")
+      }
+    }
+    if (!is.numeric(tol)) stop("tol must be a numeric.")
+    if (max_iter < 1) stop("max_iter must be at least 1.")
+    if (is.null(batch_size) || !is.numeric(batch_size) || length(batch_size) != 1) {
+      stop("batch_size must be a single numeric value.")
     }
 
-    # Computing the step
-    tan_step <- lr * Reduce(`+`, old_tan) /
-      aux_sample$sample_size
-    tan_step <- tan_step |>
-      Matrix::symmpart() |>
-      Matrix::pack()
-    new_ref_pt <- aux_sample$riem_metric$exp(old_ref_pt, tan_step)
+    aux_sample <- sample
+    delta <- Inf
+    iter <- 0
+    old_diff <- 0
 
-    delta <- Matrix::norm(new_ref_pt - old_ref_pt, "F") /
-      Matrix::norm(old_ref_pt, "F")
+    while ((delta > tol) && (iter < max_iter)) {
+      old_tan <- aux_sample$tangent_images
+      iter <- iter + 1
+      old_ref_pt <- aux_sample$ref_point
 
-    # Mapping tangent images to the new step
-    new_tan_imgs <- relocate(
-      old_ref_pt, new_ref_pt, old_tan,
-      sample$riem_metric
-    )
+      # Shuffle tangent images for batching
+      n <- length(old_tan)
+      idx <- sample(n)
+      old_tan_shuffled <- old_tan[idx]
 
-    aux_sample <- CSample$new(
-      tan_imgs = new_tan_imgs,
-      ref_pt = new_ref_pt,
-      centered = FALSE, metric_obj = sample$riem_metric
-    )
+      # Process in batches
+      for (start in seq(1, n, by = batch_size)) {
+        end <- min(start + batch_size - 1, n)
+        batch <- old_tan_shuffled[start:end]
+
+        # Compute batch step
+        tan_step <- lr * Reduce(`+`, batch) / length(batch)
+        tan_step <- tan_step |>
+          Matrix::symmpart() |>
+          Matrix::pack()
+        new_ref_pt <- aux_sample$riem_metric$exp(old_ref_pt, tan_step)
+
+        # Mapping tangent images to the new step
+        # Note: progress is disabled here to avoid overwhelming output during iterations
+        new_tan_imgs <- relocate(
+          old_ref_pt, new_ref_pt, old_tan,
+          sample$riem_metric,
+          progress = FALSE  # Suppress progress inside iteration loop
+        )
+
+        aux_sample <- CSample$new(
+          tan_imgs = new_tan_imgs,
+          ref_pt = new_ref_pt,
+          centered = FALSE, metric_obj = sample$riem_metric
+        )
+        old_ref_pt <- new_ref_pt
+        old_tan <- new_tan_imgs
+      }
+
+      # Compute delta after all batches in this epoch
+      new_diff <- Matrix::norm(aux_sample$ref_point - sample$ref_point, "F") # /
+      # Matrix::norm(sample$ref_point, "F")
+      delta <- abs(new_diff - old_diff) / old_diff
+      old_diff <- new_diff
+
+      message(sprintf("Computing Frechet mean: iteration %d, delta = %f", iter, delta))
+    }
+    if (iter == max_iter) {
+      warning(
+        "Maximum number of iterations for Frechet mean calculation reached"
+      )
+    }
+    aux_sample$ref_point
   }
-  aux_sample$ref_point
-}
 
 #' Validate Metric
 #'
@@ -371,18 +439,14 @@ dlog <- function(sigma, h) {
     stop("H must be a symmetric matrix of class dspMatrix")
   }
 
-  aux_matr <- sigma |> id_matr()
-  n <- sigma |> nrow()
-  t_vals <- seq(0, 1, length.out = 100) # Integration points
-  dt <- t_vals[2] - t_vals[1]
-
-  result <- Matrix::Matrix(0, n, n, sparse = FALSE)
-  for (t in t_vals) {
-    gamma_t <- t * sigma + (1 - t) * aux_matr
-    gamma_t_inv <- Matrix::solve(gamma_t)
-    result <- result + gamma_t_inv %*% h %*% gamma_t_inv * dt
-  }
-
+  # Convert to dense matrices for C++ computation
+  sigma_mat <- as.matrix(sigma)
+  h_mat <- as.matrix(h)
+  
+  # Call C++ implementation
+  result <- dlog_cpp(sigma_mat, h_mat, num_points = 100)
+  
+  # Convert back to symmetric packed format
   result |>
     Matrix::symmpart() |>
     Matrix::pack()
@@ -404,21 +468,14 @@ dexp <- function(a, x) {
     stop("x must be a symmetric matrix of class dspMatrix")
   }
 
-  n <- a |> nrow()
-  t_vals <- seq(0, 1, length.out = 100) # Integration points
-  dt <- t_vals[2] - t_vals[1]
-
-  result <- Matrix::Matrix(0, n, n, sparse = FALSE)
-  for (t in t_vals) {
-    gamma_left <- ((1 - t) * a) |>
-      as.matrix() |>
-      expm::expm(method = "hybrid_Eigen_Ward")
-    gamma_right <- (t * a) |>
-      as.matrix() |>
-      expm::expm(method = "hybrid_Eigen_Ward")
-    result <- result + gamma_left %*% x %*% gamma_right * dt
-  }
-
+  # Convert to dense matrices for C++ computation
+  a_mat <- as.matrix(a)
+  x_mat <- as.matrix(x)
+  
+  # Call C++ implementation
+  result <- dexp_cpp(a_mat, x_mat, num_points = 100)
+  
+  # Convert back to symmetric packed format
   result |>
     Matrix::symmpart() |>
     Matrix::pack()
@@ -431,13 +488,8 @@ dexp <- function(a, x) {
 #' @export
 safe_logm <- function(x) {
   x <- as.matrix(x)
-  tryCatch(
-    expm::logm(x, method = "Eigen"),
-    error = function(e) {
-      message(e)
-      expm::logm(x, method = "Higham08")
-    }
-  )
+  result <- safe_logm_cpp(x)
+  as.matrix(result)
 }
 
 #' Default reference point
@@ -461,4 +513,73 @@ half_underscore <- function(x) {
   diag_part <- Matrix::diag(x) / 2
   result <- lower_tri + Matrix::Diagonal(x = diag_part)
   result
+}
+
+#' Validate Backend Object
+#'
+#' Validates that a backend object inherits from DataBackend and implements required methods.
+#'
+#' @param backend A backend object to validate
+#' @return None. Throws an error if validation fails.
+#' @export
+validate_backend <- function(backend) {
+  if (is.null(backend)) {
+    stop("backend cannot be NULL")
+  }
+
+  if (!inherits(backend, "DataBackend")) {
+    stop("backend must inherit from DataBackend class")
+  }
+
+  # Check required methods exist
+  required_methods <- c("get_matrix", "get_all_matrices", "length", "get_dimensions")
+  for (method in required_methods) {
+    if (!method %in% names(backend)) {
+      stop(sprintf("backend must implement method: %s", method))
+    }
+  }
+}
+
+#' Validate Parquet Directory Structure
+#'
+#' @param data_dir Path to directory to validate
+#' @param check_files If TRUE, validates that Parquet files exist (default: TRUE)
+#' @return None. Throws an error if validation fails.
+#' @export
+validate_parquet_dir <- function(data_dir, check_files = TRUE) {
+  if (!dir.exists(data_dir)) {
+    stop(sprintf("Parquet data directory does not exist: %s", data_dir))
+  }
+
+  metadata_path <- file.path(data_dir, "metadata.json")
+  if (!file.exists(metadata_path)) {
+    stop(sprintf("metadata.json not found in directory: %s", data_dir))
+  }
+
+  # Validate metadata can be read
+  metadata <- tryCatch(
+    jsonlite::fromJSON(metadata_path),
+    error = function(e) {
+      stop(sprintf("Failed to read metadata.json: %s", e$message))
+    }
+  )
+
+  # Check required fields
+  required_fields <- c("n_matrices", "matrix_dim", "file_pattern")
+  missing <- setdiff(required_fields, names(metadata))
+  if (length(missing) > 0) {
+    stop(sprintf("metadata.json missing required fields: %s", paste(missing, collapse = ", ")))
+  }
+
+  if (check_files) {
+    # Verify at least first and last file exist
+    indices <- c(1, metadata$n_matrices)
+    for (i in indices) {
+      file_name <- sprintf(metadata$file_pattern, i)
+      file_path <- file.path(data_dir, file_name)
+      if (!file.exists(file_path)) {
+        stop(sprintf("Expected Parquet file not found: %s", file_path))
+      }
+    }
+  }
 }

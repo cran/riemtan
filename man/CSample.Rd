@@ -6,6 +6,21 @@
 \description{
 This class represents a sample of connectomes, with various properties and methods to handle their tangent and vectorized images.
 }
+\examples{
+
+## ------------------------------------------------
+## Method `CSample$load_connectomes_batched`
+## ------------------------------------------------
+
+\dontrun{
+# Create CSample with ParquetBackend
+backend <- create_parquet_backend("my_data")
+sample <- CSample$new(backend = backend, metric_obj = airm)
+
+# Load first 100 matrices in batches of 20
+conns <- sample$load_connectomes_batched(indices = 1:100, batch_size = 20)
+}
+}
 \section{Active bindings}{
 \if{html}{\out{<div class="r6-active-bindings">}}
 \describe{
@@ -32,6 +47,10 @@ This class represents a sample of connectomes, with various properties and metho
 \item{\code{sample_cov}}{Sample covariance}
 
 \item{\code{ref_point}}{Reference point for tangent or vectorized images}
+
+\item{\code{distances}}{Distances to the Frechet mean}
+
+\item{\code{batch_size}}{Batch size for compute_fmean}
 }
 \if{html}{\out{</div>}}
 }
@@ -39,6 +58,7 @@ This class represents a sample of connectomes, with various properties and metho
 \subsection{Public methods}{
 \itemize{
 \item \href{#method-CSample-new}{\code{CSample$new()}}
+\item \href{#method-CSample-load_connectomes_batched}{\code{CSample$load_connectomes_batched()}}
 \item \href{#method-CSample-compute_tangents}{\code{CSample$compute_tangents()}}
 \item \href{#method-CSample-compute_conns}{\code{CSample$compute_conns()}}
 \item \href{#method-CSample-compute_vecs}{\code{CSample$compute_vecs()}}
@@ -47,6 +67,7 @@ This class represents a sample of connectomes, with various properties and metho
 \item \href{#method-CSample-change_ref_pt}{\code{CSample$change_ref_pt()}}
 \item \href{#method-CSample-center}{\code{CSample$center()}}
 \item \href{#method-CSample-compute_variation}{\code{CSample$compute_variation()}}
+\item \href{#method-CSample-compute_dists}{\code{CSample$compute_dists()}}
 \item \href{#method-CSample-compute_sample_cov}{\code{CSample$compute_sample_cov()}}
 \item \href{#method-CSample-clone}{\code{CSample$clone()}}
 }
@@ -63,7 +84,9 @@ Initialize a CSample object
   vec_imgs = NULL,
   centered = NULL,
   ref_pt = NULL,
-  metric_obj
+  metric_obj,
+  batch_size = NULL,
+  backend = NULL
 )}\if{html}{\out{</div>}}
 }
 
@@ -81,6 +104,10 @@ Initialize a CSample object
 \item{\code{ref_pt}}{A connectome (default is identity)}
 
 \item{\code{metric_obj}}{Object of class \code{rmetric} representing the Riemannian metric used.}
+
+\item{\code{batch_size}}{The batch size for compute_fmean (default is 32).}
+
+\item{\code{backend}}{A DataBackend object (ListBackend or ParquetBackend). If NULL and conns is provided, a ListBackend will be created automatically.}
 }
 \if{html}{\out{</div>}}
 }
@@ -89,18 +116,72 @@ A new \code{CSample} object.
 }
 }
 \if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-CSample-load_connectomes_batched"></a>}}
+\if{latex}{\out{\hypertarget{method-CSample-load_connectomes_batched}{}}}
+\subsection{Method \code{load_connectomes_batched()}}{
+Load connectomes in parallel batches from ParquetBackend.
+This method is particularly useful for large Parquet-backed datasets
+where loading all matrices at once would be memory-prohibitive.
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{CSample$load_connectomes_batched(
+  indices = NULL,
+  batch_size = 50,
+  progress = FALSE
+)}\if{html}{\out{</div>}}
+}
+
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{indices}}{Optional vector of indices to load. If NULL (default), loads all matrices.}
+
+\item{\code{batch_size}}{Number of matrices to load per batch (default: 50).
+Larger batches use more memory but may be faster.}
+
+\item{\code{progress}}{Logical indicating whether to show progress (default: FALSE).}
+}
+\if{html}{\out{</div>}}
+}
+\subsection{Details}{
+This method only works when the CSample was initialized with a ParquetBackend.
+It loads matrices in parallel batches, clearing the cache between batches to
+manage memory usage. Sequential loading is used for ListBackend.
+}
+
+\subsection{Returns}{
+A list of dppMatrix objects.
+}
+\subsection{Examples}{
+\if{html}{\out{<div class="r example copy">}}
+\preformatted{\dontrun{
+# Create CSample with ParquetBackend
+backend <- create_parquet_backend("my_data")
+sample <- CSample$new(backend = backend, metric_obj = airm)
+
+# Load first 100 matrices in batches of 20
+conns <- sample$load_connectomes_batched(indices = 1:100, batch_size = 20)
+}
+}
+\if{html}{\out{</div>}}
+
+}
+
+}
+\if{html}{\out{<hr>}}
 \if{html}{\out{<a id="method-CSample-compute_tangents"></a>}}
 \if{latex}{\out{\hypertarget{method-CSample-compute_tangents}{}}}
 \subsection{Method \code{compute_tangents()}}{
 This function computes the tangent images from the connectomes.
 \subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{CSample$compute_tangents(ref_pt = default_ref_pt(private$p))}\if{html}{\out{</div>}}
+\if{html}{\out{<div class="r">}}\preformatted{CSample$compute_tangents(ref_pt = default_ref_pt(private$p), progress = FALSE)}\if{html}{\out{</div>}}
 }
 
 \subsection{Arguments}{
 \if{html}{\out{<div class="arguments">}}
 \describe{
 \item{\code{ref_pt}}{A reference point, which must be a \code{dppMatrix} object (default is \code{default_ref_pt}).}
+
+\item{\code{progress}}{Logical indicating whether to show progress (default: FALSE).}
 }
 \if{html}{\out{</div>}}
 }
@@ -118,9 +199,16 @@ None
 \subsection{Method \code{compute_conns()}}{
 This function computes the connectomes from the tangent images.
 \subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{CSample$compute_conns()}\if{html}{\out{</div>}}
+\if{html}{\out{<div class="r">}}\preformatted{CSample$compute_conns(progress = FALSE)}\if{html}{\out{</div>}}
 }
 
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{progress}}{Logical indicating whether to show progress (default: FALSE).}
+}
+\if{html}{\out{</div>}}
+}
 \subsection{Details}{
 Error if tangent images are not specified.
 }
@@ -135,9 +223,16 @@ None
 \subsection{Method \code{compute_vecs()}}{
 This function computes the vectorized tangent images from the tangent images.
 \subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{CSample$compute_vecs()}\if{html}{\out{</div>}}
+\if{html}{\out{<div class="r">}}\preformatted{CSample$compute_vecs(progress = FALSE)}\if{html}{\out{</div>}}
 }
 
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{progress}}{Logical indicating whether to show progress (default: FALSE).}
+}
+\if{html}{\out{</div>}}
+}
 \subsection{Details}{
 Error if tangent images are not specified.
 }
@@ -152,9 +247,16 @@ None
 \subsection{Method \code{compute_unvecs()}}{
 This function computes the tangent images from the vector images.
 \subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{CSample$compute_unvecs()}\if{html}{\out{</div>}}
+\if{html}{\out{<div class="r">}}\preformatted{CSample$compute_unvecs(progress = FALSE)}\if{html}{\out{</div>}}
 }
 
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{progress}}{Logical indicating whether to show progress (default: FALSE).}
+}
+\if{html}{\out{</div>}}
+}
 \subsection{Details}{
 Error if \code{vec_imgs} is not specified.
 }
@@ -169,7 +271,13 @@ None
 \subsection{Method \code{compute_fmean()}}{
 This function computes the Frechet mean of the sample.
 \subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{CSample$compute_fmean(tol = 0.05, max_iter = 20, lr = 0.2)}\if{html}{\out{</div>}}
+\if{html}{\out{<div class="r">}}\preformatted{CSample$compute_fmean(
+  tol = 0.001,
+  max_iter = 100,
+  lr = 0.2,
+  batch_size = NULL,
+  progress = FALSE
+)}\if{html}{\out{</div>}}
 }
 
 \subsection{Arguments}{
@@ -180,6 +288,10 @@ This function computes the Frechet mean of the sample.
 \item{\code{max_iter}}{Maximum number of iterations for the computation (default is 20).}
 
 \item{\code{lr}}{Learning rate for the optimization algorithm (default is 0.2).}
+
+\item{\code{batch_size}}{The batch size (default is the instance's batch_size).}
+
+\item{\code{progress}}{Logical indicating whether to show progress (default: FALSE).}
 }
 \if{html}{\out{</div>}}
 }
@@ -193,13 +305,15 @@ None
 \subsection{Method \code{change_ref_pt()}}{
 This function changes the reference point for the tangent images.
 \subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{CSample$change_ref_pt(new_ref_pt)}\if{html}{\out{</div>}}
+\if{html}{\out{<div class="r">}}\preformatted{CSample$change_ref_pt(new_ref_pt, progress = FALSE)}\if{html}{\out{</div>}}
 }
 
 \subsection{Arguments}{
 \if{html}{\out{<div class="arguments">}}
 \describe{
 \item{\code{new_ref_pt}}{A new reference point, which must be a \code{dppMatrix} object.}
+
+\item{\code{progress}}{Logical indicating whether to show progress (default: FALSE).}
 }
 \if{html}{\out{</div>}}
 }
@@ -239,6 +353,23 @@ Compute Variation
 
 \subsection{Details}{
 This function computes the variation of the sample. It first checks if the vector images are null, and if so, it computes the vectors, computing first the tangent images if necessary. If the sample is not centered, it centers the sample and recomputes the vectors. Finally, it calculates the variation as the mean of the sum of squares of the vector images. Error if \code{vec_imgs} is not specified.
+}
+
+\subsection{Returns}{
+None. This function is called for its side effects.
+}
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-CSample-compute_dists"></a>}}
+\if{latex}{\out{\hypertarget{method-CSample-compute_dists}{}}}
+\subsection{Method \code{compute_dists()}}{
+Compute distances
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{CSample$compute_dists()}\if{html}{\out{</div>}}
+}
+
+\subsection{Details}{
+This function computes the distances of the elements of the sample to the Frechet mean. It first checks if the vector images are null, and if so, it computes the vectors, computing first the tangent images if necessary. If the sample is not centered, it centers the sample and recomputes the vectors. Finally, it calculates the distances as the Euclidean norms of the vector images. Error if \code{vec_imgs} is not specified.
 }
 
 \subsection{Returns}{

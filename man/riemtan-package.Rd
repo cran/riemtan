@@ -6,7 +6,7 @@
 \alias{riemtan-package}
 \title{riemtan: Riemannian Metrics for Symmetric Positive Definite Matrices}
 \description{
-Implements various Riemannian metrics for symmetric positive definite matrices, including AIRM (Affine Invariant Riemannian Metric, see Pennec, Fillard, and Ayache (2006) \doi{10.1007/s11263-005-3222-z}), Log-Euclidean (see Arsigny, Fillard, Pennec, and Ayache (2006) \doi{10.1002/mrm.20965}), Euclidean, Log-Cholesky (see Lin (2019) \doi{10.1137/18M1221084}), and Bures-Wasserstein metrics (see Bhatia, Jain, and Lim (2019) \doi{10.1016/j.exmath.2018.01.002}). Provides functions for computing logarithmic and exponential maps, vectorization, and statistical operations on the manifold of positive definite matrices.
+Implements various Riemannian metrics for symmetric positive definite matrices, including AIRM (Affine Invariant Riemannian Metric, \doi{10.1007/s11263-005-3222-z}), Log-Euclidean (\doi{10.1002/mrm.20965}), Euclidean, Log-Cholesky (\doi{10.1137/18M1221084}), and Bures-Wasserstein metrics (\doi{10.1016/j.exmath.2018.01.002}). Provides functions for computing logarithmic and exponential maps, vectorization, and statistical operations on the manifold of positive definite matrices.
 }
 \seealso{
 Useful links:
